@@ -24,6 +24,12 @@ public func configure(
     // Configure the authentication provider
     try services.register(AuthenticationProvider())
     
+    /// Register middleware
+    var middlewares = MiddlewareConfig() // Create _empty_ middleware config
+    middlewares.use(FileMiddleware.self) // Serves files from `Public/` directory
+    middlewares.use(ErrorMiddleware.self) // Catches errors and converts to HTTP response
+    services.register(middlewares)
+    
     // Configure our database
     var databaseConfig = DatabasesConfig()
     let db = try SQLiteDatabase(storage: .file(path: "\(directoryConfig.workDir)auth.db"))
