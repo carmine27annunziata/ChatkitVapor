@@ -20,4 +20,6 @@ final class TodoController {
             return todo.delete(on: req)
         }.transform(to: .ok)
     }
+    func welcome(_ req: Request) throws -> Future<View> {
+        return try  req.view().render("home.leaf")   }
 }
