@@ -3,11 +3,91 @@ import Vapor
 import FluentSQLite
 import Authentication
 
-/// Called before your application initializes.
-public func configure(
-    _ config: inout Config,
-    _ env: inout Environment,
-    _ services: inout Services) throws {
+let room = Room()
+
+public func configure(_ config: inout Config, _ env: inout Environment, _ services: inout Services) throws {
+    let serverConfiure = NIOServerConfig.default(hostname: "0.0.0.0", port: 9090)
+    services.register(serverConfiure)
+    
+    let wss = NIOWebSocketServer.default()
+    
+    wss.get("chat") { ws, req in
+        var pingTimer: DispatchSourceTimer? = nil
+        var username: String? = nil
+        
+        pingTimer = DispatchSource.makeTimerSource()
+        pingTimer?.schedule(deadline: .now(), repeating: .seconds(25))
+        //pingTimer?.setEventHandler { try? ws.ping() }
+        pingTimer?.resume()
+        
+        ws.onText { ws, text in
+            if let decoded = try? JSONDecoder().decode(Username.self, from: text) {
+                username = decoded.username
+                room.connections[decoded.username] = ws
+                room.bot("\(decoded.username) has joined. 👋")
+            }
+            
+            if let u = username, let decoded = try? JSONDecoder().decode(Message.self, from: text) {
+                room.send(name: u, message: decoded.message)
+            }
+            
+           //ws.send(text)
+        }
+        
+        ws.onClose { ws in
+            pingTimer?.cancel()
+            pingTimer = nil
+            
+            guard let u = username else {
+                return
+            }
+            
+            room.bot("\(u) has left")
+            room.connections.removeValue(forKey: u)
+        }
+        
+        /*var pingTimer: DispatchSourceTimer? = nil
+        var username: String? = nil
+        
+        pingTimer = DispatchSource.makeTimerSource()
+        pingTimer?.schedule(deadline: .now(), repeating: .seconds(25))
+        pingTimer?.setEventHandler { try? ws.ping() }
+        pingTimer?.resume()
+        
+        ws.onText { ws, text in
+            let json = try JSON(bytes: text.makeBytes())
+            
+            if let u = json.object?["username"]?.string {
+                username = u
+                room.connections[u] = ws
+                room.bot("\(u) has joined. 👋")
+            }
+            
+            if let u = username, let m = json.object?["message"]?.string {
+                room.send(name: u, message: m)
+            }
+        }*/
+        
+        /*ws.onClose { ws, _, _, _ in
+            pingTimer?.cancel()
+            pingTimer = nil
+            
+            guard let u = username else {
+                return
+            }
+            
+            room.bot("\(u) has left")
+            room.connections.removeValue(forKey: u)
+        }*/
+        
+        // Add a new on text callback
+        /*ws.onText { ws, text in
+            // Simply echo any received text
+            ws.send(text)
+        }*/
+    }
+    
+    services.register(wss, as: WebSocketServer.self)
     
     // Register routes to the router
     let router = EngineRouter.default()

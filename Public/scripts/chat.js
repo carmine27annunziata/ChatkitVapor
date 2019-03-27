@@ -42,7 +42,7 @@ function Chat(host) {
         chat.ws.send(JSON.stringify({
             'message': message
         }));
-
+        
         chat.bubble(message);
     }
 
